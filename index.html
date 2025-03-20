@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Notifications</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+
+<body>
+    <h1>Real-Time Notifications</h1>
+    <button onclick="connectWebSocket()">Connect WebSocket</button>
+    <button onclick="sendNotification()">Send Notification</button>
+    <button onclick="disconnectWebSocket()">Disconnect WebSocket</button>
+
+    <ul id="notifications"></ul>
+
+    <script>
+        let socket;
+        let userId = "user-123";
+        let token = "";
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 3;
+
+        async function getToken() {
+            try {
+                const response = await fetch("http://localhost:3000/generate-token", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId })
+                });
+
+                if (!response.ok) throw new Error("Failed to get token");
+
+                const data = await response.json();
+                token = data.token;
+                console.log("🔑 Received Token:", token);
+            } catch (error) {
+                console.error("❌ Error getting token:", error);
+            }
+        }
+
+        async function connectWebSocket() {
+            await getToken();
+
+            socket = io("http://localhost:3000", {
+                auth: { token },
+                reconnection: true,
+                reconnectionAttempts: maxReconnectAttempts,
+                reconnectionDelay: 2000, // 2 seconds delay before retry
+            });
+
+            socket.on("connect", () => {
+                console.log("✅ Connected to WebSocket (ID:", socket.id, ")");
+                socket.emit("subscribe", { userId });
+                reconnectAttempts = 0; // Reset counter
+            });
+
+            socket.on("notification", (data) => {
+                console.log(`🔔 ${data.type.toUpperCase()} Notification:`, data.message);
+
+                const notificationBox = document.createElement("p");
+                notificationBox.textContent = `${data.message} (${data.type})`;
+                notificationBox.style.color =
+                    data.type === "info" ? "blue" :
+                        data.type === "warning" ? "orange" : "red";
+
+                document.getElementById("notifications").appendChild(notificationBox);
+            });
+
+            socket.on("disconnect", (reason) => {
+                console.warn(`❌ Disconnected: ${reason}`);
+                attemptReconnect();
+            });
+
+            socket.on("connect_error", (err) => {
+                console.error("🚨 Connection Error:", err.message);
+            });
+
+            socket.on("reconnect_attempt", (attempt) => {
+                console.log(`🔄 Reconnect Attempt #${attempt}`);
+            });
+
+            socket.on("reconnect_failed", () => {
+                console.warn("⚠️ Reconnect Failed. Check server status.");
+            });
+        }
+
+        function attemptReconnect() {
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                console.log(`🔄 Attempting to reconnect... (${reconnectAttempts}/${maxReconnectAttempts})`);
+                setTimeout(connectWebSocket, 2000);
+            } else {
+                console.log("⚠️ Maximum reconnect attempts reached. Manual reconnection required.");
+            }
+        }
+
+        async function disconnectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                console.log("❌ WebSocket Disconnected Manually");
+            }
+        }
+
+        async function sendNotification() {
+            try {
+                const response = await fetch("http://localhost:3000/notifications/send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId, message: "This is a test notification!", type: "info" }),
+                });
+
+                if (!response.ok) throw new Error("Failed to send notification");
+
+                const data = await response.json();
+                console.log("📤 Notification request sent:", data);
+            } catch (error) {
+                console.error("❌ Error sending notification:", error);
+            }
+        }
+    </script>
+</body>
+
+</html>
