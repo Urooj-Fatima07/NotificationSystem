@@ -38,23 +38,30 @@
                 console.log("🔑 Received Token:", token);
             } catch (error) {
                 console.error("❌ Error getting token:", error);
+                alert("Error: Unable to retrieve authentication token. Please try again.");
             }
         }
 
         async function connectWebSocket() {
             await getToken();
 
+            if (!token) {
+                console.error("🚫 Connection aborted: No valid token");
+                alert("Error: Authentication failed. Please refresh and try again.");
+                return;
+            }
+
             socket = io("http://localhost:3000", {
                 auth: { token },
                 reconnection: true,
                 reconnectionAttempts: maxReconnectAttempts,
-                reconnectionDelay: 2000, // 2 seconds delay before retry
+                reconnectionDelay: 2000,
             });
 
             socket.on("connect", () => {
                 console.log("✅ Connected to WebSocket (ID:", socket.id, ")");
                 socket.emit("subscribe", { userId });
-                reconnectAttempts = 0; // Reset counter
+                reconnectAttempts = 0;
             });
 
             socket.on("notification", (data) => {
@@ -63,8 +70,11 @@
                 const notificationBox = document.createElement("p");
                 notificationBox.textContent = `${data.message} (${data.type})`;
                 notificationBox.style.color =
-                    data.type === "info" ? "blue" :
-                        data.type === "warning" ? "orange" : "red";
+                    data.type === "info" ? "#007bff" :    
+                        data.type === "warning" ? "#ff9800" :
+                            data.type === "success" ? "#28a745" :
+                                "#dc3545";
+
 
                 document.getElementById("notifications").appendChild(notificationBox);
             });
@@ -74,8 +84,16 @@
                 attemptReconnect();
             });
 
-            socket.on("connect_error", (err) => {
+            socket.on("connect_error", async (err) => {
                 console.error("🚨 Connection Error:", err.message);
+
+                if (err.message.includes("Invalid token") || err.message.includes("jwt expired")) {
+                    console.warn("🔄 Token expired. Fetching a new token...");
+                    await getToken();
+                    connectWebSocket(); // Reconnect with the new token
+                } else {
+                    alert(`WebSocket Connection Error: ${err.message}`);
+                }
             });
 
             socket.on("reconnect_attempt", (attempt) => {
@@ -84,6 +102,7 @@
 
             socket.on("reconnect_failed", () => {
                 console.warn("⚠️ Reconnect Failed. Check server status.");
+                alert("Connection lost. Please refresh the page.");
             });
         }
 
@@ -94,6 +113,7 @@
                 setTimeout(connectWebSocket, 2000);
             } else {
                 console.log("⚠️ Maximum reconnect attempts reached. Manual reconnection required.");
+                alert("WebSocket disconnected. Please refresh to reconnect.");
             }
         }
 

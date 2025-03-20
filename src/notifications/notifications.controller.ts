@@ -6,10 +6,8 @@ export class NotificationsController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Post('send')
-  sendNotification(
-    @Body() { userId, message, type }: { userId: string; message: string; type: 'info' | 'warning' | 'error' | 'success' }
-  ) {
-    this.notificationService.triggerNewOrderNotification(userId);
+  sendNotification(@Body() { userId }: { userId: string }) {
+    this.notificationService.triggerRandomNotification(userId);
     return { status: 'success', message: 'Notification sent successfully' };
   }
 }

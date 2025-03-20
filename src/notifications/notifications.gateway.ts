@@ -20,14 +20,14 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
       console.log(`✅ Authorized User: ${decoded.userId}`);
 
-      client.join(decoded.userId); // ✅ Join user's unique room
+      client.join(decoded.userId); 
       this.connectedClients.set(client.id, { socket: client, userId: decoded.userId });
     } catch (error) {
       console.log(`❌ Unauthorized attempt: ${client.id} - Invalid token`, error.message);
       client.disconnect();
     }
   }
-
+               
   handleDisconnect(client: Socket) {
     console.log(`❌ Client Disconnected: ${client.id}`);
     this.connectedClients.delete(client.id);
@@ -37,13 +37,13 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   handleSubscribe(@MessageBody() data: { userId: string }, @ConnectedSocket() client: Socket) {
     if (!data.userId) return;
 
-    client.join(data.userId); // ✅ Make sure the user is added to their specific room
+    client.join(data.userId);
     console.log(`🔔 User ${data.userId} subscribed to notifications`);
   }
 
   // Emit event-driven notifications
-  sendNotification(userId: string, message: string, type: 'info' | 'warning' | 'error' | 'success') {
-    this.server.to(userId).emit('notification', { message, type }); // ✅ Send notification to the correct user room
+  sendNotification(userId: string, message: string, type: string) {
+    this.server.to(userId).emit('notification', { message, type }); 
     console.log(`📨 Notification sent to User ${userId}: ${message}`);
   }  
 }
